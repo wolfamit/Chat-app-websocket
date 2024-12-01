@@ -3,22 +3,34 @@ import "./App.css";
 
 function App() {
   const [messages, setMessages] = useState<string[]>([]); // Store chat messages
+  const [inputMessage, setInputMessage] = useState<string>(""); // Input message state
   const ws = useRef<WebSocket | null>(null); // WebSocket reference
 
   useEffect(() => {
     // Establish WebSocket connection
     ws.current = new WebSocket("ws://localhost:8080");
-    ws.current.send(JSON.stringify({
-      "type" : "join" ,
-      "payload" : {
-        "roomId": "red"
-      } 
-    }));
-    
+
+    // Send "join" message after the connection is established
+    ws.current.onopen = () => {
+      ws.current?.send(
+        JSON.stringify({
+          type: "join",
+          payload: {
+            roomId: "red",
+          },
+        })
+      );
+    };
+
     // Handle incoming messages
     ws.current.onmessage = (event) => {
-      const newMessage = event.data as string; // Assuming messages are strings
-      setMessages((prevMessages) => [...prevMessages, newMessage]);
+      try {
+        
+        const newMessage = event.data;
+        setMessages((prevMessages) => [...prevMessages, newMessage]);
+      } catch (error) {
+        console.error("Error parsing incoming message:", error);
+      }
     };
 
     // Handle WebSocket connection errors
@@ -34,21 +46,24 @@ function App() {
     };
   }, []);
 
-  const sendMessage = (messageText : string) => {
+  const sendMessage = () => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({
-        "type" : "chat" ,
-        "payload" : {
-          "message": messageText
-        } 
-      })); // Send message to WebSocket server
+      ws.current.send(
+        JSON.stringify({
+          type: "chat",
+          payload: {
+            message: inputMessage,
+          },
+        })
+      );
+      setInputMessage(""); // Clear input field after sending
     } else {
       console.error("WebSocket is not open");
     }
   };
 
   return (
-    <div className="h-screen bg-black flex flex-col justify-between">
+    <div className="h-[100vh]  bg-black flex flex-col justify-between">
       {/* Header */}
       <h1 className="text-center text-3xl text-white py-4 border-b border-gray-700">
         Chat App
@@ -72,8 +87,18 @@ function App() {
           className="flex-1 p-3 rounded-lg text-lg bg-gray-900 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-400 outline-none"
           type="text"
           placeholder="Write your message"
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)} // Update input state
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && inputMessage.trim() !== "") {
+              sendMessage();
+            }
+          }}
         />
-        <button className="ml-3 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-lg font-semibold rounded-lg shadow-md">
+        <button
+          className="ml-3 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-lg font-semibold rounded-lg shadow-md"
+          onClick={sendMessage}
+        >
           Send
         </button>
       </div>
